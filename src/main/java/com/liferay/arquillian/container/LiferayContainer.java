@@ -15,13 +15,12 @@
 package com.liferay.arquillian.container;
 
 import org.apache.http.Header;
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.InputStreamEntity;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.jboss.arquillian.container.spi.client.container.DeployableContainer;
 import org.jboss.arquillian.container.spi.client.container.DeploymentException;
@@ -35,17 +34,15 @@ import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.exporter.ZipExporter;
 import org.jboss.shrinkwrap.descriptor.api.Descriptor;
 
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 
 /**
  * @author Carlos Sierra Andrés
  */
-public class LiferayContainer implements DeployableContainer<LiferayContainerConfiguration> {
+public class LiferayContainer
+	implements DeployableContainer<LiferayContainerConfiguration> {
 
 	@Override
 	public Class<LiferayContainerConfiguration> getConfigurationClass() {
@@ -53,7 +50,8 @@ public class LiferayContainer implements DeployableContainer<LiferayContainerCon
 	}
 
 	@Override
-	public void setup(LiferayContainerConfiguration liferayContainerConfiguration) {
+	public void setup(
+		LiferayContainerConfiguration liferayContainerConfiguration) {
 
 		_liferayContainerConfiguration = liferayContainerConfiguration;
 	}
@@ -73,13 +71,28 @@ public class LiferayContainer implements DeployableContainer<LiferayContainerCon
 		return new ProtocolDescription("Servlet 2.5");
 	}
 
+	private String buildDeploymentUrl() {
+		String protocol = _liferayContainerConfiguration.getProtocol();
+		String host = _liferayContainerConfiguration.getHost();
+		int port = _liferayContainerConfiguration.getPort();
+		String portalContextRoot =
+			_liferayContainerConfiguration.getPortalContextRoot();
+		String moduleFrameworkContext =
+			_liferayContainerConfiguration.getModuleFrameworkContext();
+		String arquillianDeployerContext =
+			_liferayContainerConfiguration.getArquillianDeployerContext();
+
+		return protocol+"://"+host+":"+port+"/"+portalContextRoot+"/"+
+			moduleFrameworkContext+"/"+ arquillianDeployerContext+
+			"/arquillian-deploy";
+	}
+
 	@Override
-	public ProtocolMetaData deploy(Archive<?> archive) throws DeploymentException {
-		String deploymentUrl = null;
+	public ProtocolMetaData deploy(Archive<?> archive)
+		throws DeploymentException {
 
 		try {
-			deploymentUrl =
-				"http://localhost:8080/o/arquillian-deploy/arquillian-deploy?location=dummy";
+			String deploymentUrl = buildDeploymentUrl();
 
 			HttpPost httpPost = new HttpPost(deploymentUrl);
 
@@ -89,8 +102,11 @@ public class LiferayContainer implements DeployableContainer<LiferayContainerCon
 
 			InputStream inputStream = zipView.exportAsInputStream();
 
-			HttpEntity entity = MultipartEntityBuilder.create().addBinaryBody(
-				archive.getName(), inputStream).build();
+			MultipartEntity entity = new MultipartEntity();
+
+			entity.addPart(
+				archive.getName(),
+				new InputStreamBody(inputStream, archive.getName()));
 
 			httpPost.setEntity(entity);
 
@@ -100,7 +116,9 @@ public class LiferayContainer implements DeployableContainer<LiferayContainerCon
 
 			ProtocolMetaData protocolMetaData = new ProtocolMetaData();
 
-			HTTPContext httpContext = new HTTPContext("localhost", 8080);
+			HTTPContext httpContext = new HTTPContext(
+				_liferayContainerConfiguration.getHost(),
+				_liferayContainerConfiguration.getPort());
 
 			httpContext.add(new Servlet(
 				ServletMethodExecutor.ARQUILLIAN_SERVLET_NAME,
@@ -109,7 +127,6 @@ public class LiferayContainer implements DeployableContainer<LiferayContainerCon
 			protocolMetaData.addContext(httpContext);
 
 			return protocolMetaData;
-
 		} catch (MalformedURLException e) {
 			throw new DeploymentException("Invalid URL for portal", e);
 		} catch (ClientProtocolException e) {
@@ -118,15 +135,11 @@ public class LiferayContainer implements DeployableContainer<LiferayContainerCon
 			throw new DeploymentException("Invalid URL for portal", e);
 		}
 
-
 	}
 
 	@Override
 	public void undeploy(Archive<?> archive) throws DeploymentException {
-		String deploymentUrl =
-			"http://localhost:8080/o/arquillian-deploy/arquillian-deploy?location=dummy";
-
-		HttpPost httpPost = new HttpPost(deploymentUrl);
+		String deploymentUrl = buildDeploymentUrl();
 
 		DefaultHttpClient httpClient = new DefaultHttpClient();
 
