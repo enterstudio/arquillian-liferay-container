@@ -92,7 +92,7 @@ public class LiferayTestEnricher implements TestEnricher {
 		Annotation[] annotations, Class<?> annotationClass) {
 
 		for (Annotation current : annotations) {
-			if (current.equals(annotationClass)) {
+			if (annotationClass.isAssignableFrom(current.annotationType())) {
 				return true;
 			}
 		}
