@@ -15,13 +15,17 @@
 package com.liferay.arquillian.container;
 
 import org.apache.http.Header;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.StatusLine;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.InputStreamBody;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.protocol.HTTP;
 import org.jboss.arquillian.container.spi.client.container.DeployableContainer;
 import org.jboss.arquillian.container.spi.client.container.DeploymentException;
 import org.jboss.arquillian.container.spi.client.container.LifecycleException;
@@ -36,7 +40,10 @@ import org.jboss.shrinkwrap.descriptor.api.Descriptor;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.net.MalformedURLException;
+import java.util.Scanner;
 
 /**
  * @author Carlos Sierra Andrés
@@ -98,43 +105,110 @@ public class LiferayContainer
 
 			DefaultHttpClient httpClient = new DefaultHttpClient();
 
-			ZipExporter zipView = archive.as(ZipExporter.class);
-
-			InputStream inputStream = zipView.exportAsInputStream();
-
-			MultipartEntity entity = new MultipartEntity();
-
-			entity.addPart(
-				archive.getName(),
-				new InputStreamBody(inputStream, archive.getName()));
+			MultipartEntity entity = createMultipartEntity(archive);
 
 			httpPost.setEntity(entity);
 
 			HttpResponse response = httpClient.execute(httpPost);
 
+			checkErrors(response);
+
 			Header contextPath = response.getFirstHeader("Bundle-Context-Path");
 
-			ProtocolMetaData protocolMetaData = new ProtocolMetaData();
-
-			HTTPContext httpContext = new HTTPContext(
-				_liferayContainerConfiguration.getHost(),
-				_liferayContainerConfiguration.getPort());
-
-			httpContext.add(new Servlet(
-				ServletMethodExecutor.ARQUILLIAN_SERVLET_NAME,
-				contextPath.getValue()));
-
-			protocolMetaData.addContext(httpContext);
+			ProtocolMetaData protocolMetaData = createProtocolMetadata(
+				contextPath);
 
 			return protocolMetaData;
-		} catch (MalformedURLException e) {
+		}
+		catch (MalformedURLException e) {
 			throw new DeploymentException("Invalid URL for portal", e);
-		} catch (ClientProtocolException e) {
+		}
+		catch (ClientProtocolException e) {
 			throw new DeploymentException("Invalid URL for portal", e);
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			throw new DeploymentException("Invalid URL for portal", e);
 		}
 
+	}
+
+	private MultipartEntity createMultipartEntity(Archive<?> archive) {
+		ZipExporter zipView = archive.as(ZipExporter.class);
+
+		InputStream inputStream = zipView.exportAsInputStream();
+
+		MultipartEntity entity = new MultipartEntity();
+
+		entity.addPart(
+			archive.getName(),
+			new InputStreamBody(inputStream, archive.getName()));
+		return entity;
+	}
+
+	private ProtocolMetaData createProtocolMetadata(Header contextPath) {
+		ProtocolMetaData protocolMetaData = new ProtocolMetaData();
+
+		HTTPContext httpContext = new HTTPContext(
+			_liferayContainerConfiguration.getHost(),
+			_liferayContainerConfiguration.getPort());
+
+		httpContext.add(new Servlet(
+			ServletMethodExecutor.ARQUILLIAN_SERVLET_NAME,
+			contextPath.getValue()));
+
+		protocolMetaData.addContext(httpContext);
+		return protocolMetaData;
+	}
+
+	private void checkErrors(HttpResponse response)
+		throws IOException, DeploymentException {
+
+		StatusLine statusLine = response.getStatusLine();
+
+		int statusCode = statusLine.getStatusCode();
+
+		if (statusCode != HttpStatus.SC_OK) {
+			final String stackTrace = getBodyAsString(response);
+
+			throw new DeploymentException(stackTrace) {
+
+				@Override
+				public void printStackTrace(PrintWriter printWriter) {
+					printWriter.println("REMOTE: " + stackTrace);
+				}
+
+				@Override
+				public void printStackTrace(PrintStream printStream) {
+					printStream.println("REMOTE: " + stackTrace);
+				}
+
+				@Override
+				public void printStackTrace() {
+					System.out.println("REMOTE: " + stackTrace);
+				}
+
+				@Override
+				public synchronized Throwable fillInStackTrace() {
+					return this;
+				}
+			};
+		}
+	}
+
+	private String getBodyAsString(HttpResponse response) throws IOException {
+		HttpEntity responseEntity = response.getEntity();
+
+		InputStream content = responseEntity.getContent();
+
+		Header contentEncoding = responseEntity.getContentEncoding();
+
+		String encoding = contentEncoding != null ? contentEncoding.getValue() :
+			"ISO-8859-1";
+
+		Scanner scanner = new Scanner(
+			content, encoding).useDelimiter("\\A");
+
+		return scanner.hasNext() ? scanner.next() : "";
 	}
 
 	@Override
@@ -147,7 +221,8 @@ public class LiferayContainer
 
 		try {
 			httpClient.execute(httpDelete);
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			throw new DeploymentException("Error undeploying", e);
 		}
 	}
