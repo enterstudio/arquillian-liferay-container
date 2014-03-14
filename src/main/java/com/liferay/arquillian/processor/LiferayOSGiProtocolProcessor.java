@@ -46,6 +46,8 @@ public class LiferayOSGiProtocolProcessor implements ProtocolArchiveProcessor {
 		Collection<Archive<?>> auxiliaryArchives =
 			testDeployment.getAuxiliaryArchives();
 
+		osgiManifestUtil.appendToClassPath("WEB-INF/classes");
+
 		for (Archive<?> auxiliaryArchive : auxiliaryArchives) {
 			if (Validate.isArchiveOfType(JavaArchive.class, auxiliaryArchive)) {
 				osgiManifestUtil.appendToClassPath(
@@ -55,6 +57,8 @@ public class LiferayOSGiProtocolProcessor implements ProtocolArchiveProcessor {
 
 		osgiManifestUtil.appendToImport("javax.servlet");
 		osgiManifestUtil.appendToImport("javax.servlet.http");
+
+		osgiManifestUtil.appendToImport("org.osgi.framework");
 
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		try {
