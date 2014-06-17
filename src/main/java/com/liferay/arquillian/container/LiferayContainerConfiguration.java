@@ -74,7 +74,7 @@ public class LiferayContainerConfiguration implements ContainerConfiguration {
 	public void validate() throws ConfigurationException {
 	}
 
-	private String _arquillianDeployerContext = "arquillian-deploy";
+	private String _arquillianDeployerContext = "arquillian-bundle-manager";
 	private String _host = "localhost";
 	private String _moduleFrameworkContext = "o";
 	private int _port = 8080;

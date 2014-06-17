@@ -90,7 +90,7 @@ public class LiferayContainer
 
 		return protocol+"://"+host+":"+port+"/"+portalContextRoot+"/"+
 			moduleFrameworkContext+"/"+ arquillianDeployerContext+
-			"/arquillian-deploy";
+			"/arquillian-bundle-manager";
 	}
 
 	@Override
