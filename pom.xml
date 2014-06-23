@@ -6,7 +6,7 @@
 
 	<groupId>arquillian-liferay-container</groupId>
 	<artifactId>arquillian-liferay-container</artifactId>
-	<version>0.0.5-SNAPSHOT</version>
+	<version>0.0.2-SNAPSHOT</version>
 
 	<dependencyManagement>
 		<dependencies>
